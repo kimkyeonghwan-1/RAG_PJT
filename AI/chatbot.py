@@ -1,101 +1,45 @@
 import os
-import pandas as pd
 from dotenv import load_dotenv
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_upstage import UpstageEmbeddings, UpstageDocumentParseLoader, ChatUpstage
+from langchain_upstage import ChatUpstage, UpstageEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.retrievers import BM25Retriever
-from langchain.retrievers import EnsembleRetriever
-from pinecone import Pinecone, ServerlessSpec
 from langchain_pinecone import PineconeVectorStore
-from langchain.schema import Document
+from langchain.retrievers import EnsembleRetriever
 
 # 환경 변수 로드
 load_dotenv()
 
-# Pinecone 및 Upstage 관련 API 키 로드
+# API 키 및 설정
 pinecone_api_key = os.environ.get("PINECONE_API_KEY")
 embedding_upstage = UpstageEmbeddings(model="embedding-query")
+index_name = "samsung"
 
-# 1. 데이터 불러오기
-def load_data():
-    # df_dart.csv 파일에서 데이터 로드
-    df = pd.read_csv('df_dart.csv', encoding='utf-8-sig')
-    
-    # 'text' 컬럼을 문서 내용으로 사용하여 Document 객체로 변환
-    docs = [
-        Document(
-            page_content=row['text'],
-            metadata={
-                "corp_name": row['corp_name'],
-                "report_nm": row['report_nm'],
-                "rcept_dt": row['rcept_dt']
-            }
-        )
-        for _, row in df.iterrows()
-    ]
-    
-    return docs
-
-# 2. 문서 분할
-def split_documents(docs):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,  # 텍스트 분할 크기
-        chunk_overlap=200,  # 분할된 텍스트의 중첩 크기
-        length_function=len,  # 텍스트 길이 계산
-        separators=["\n\n", "\n", " ", ""]  # 분할 기준
-    )
-    
-    # 문서 분할
-    splits = text_splitter.split_documents(docs)
-    return splits
-
-# 3. Pinecone 인덱스 설정
-def setup_pinecone(index_name="samsung"):
-    # Pinecone 초기화
-    pc = Pinecone(api_key=pinecone_api_key)
-    
-    # 인덱스가 없으면 새로 생성
-    if index_name not in pc.list_indexes().names():
-        pc.create_index(
-            name=index_name,
-            dimension=4096,
-            metric="cosine",
-            spec=ServerlessSpec(cloud="aws", region="us-east-2")
-        )
-    
-    return pc
-
-# 4. 벡터 저장소 생성
-def create_vectorstore(splits, embedding_upstage, index_name="samsung"):
-    # embedding 파라미터를 추가하여 PineconeVectorStore 생성
-    vectorstore = PineconeVectorStore.from_documents(
-        splits, embedding=embedding_upstage, index_name=index_name
+# 1. Pinecone에서 벡터 저장소 불러오기
+def load_vectorstore(index_name="samsung"):
+    vectorstore = PineconeVectorStore(
+        index_name=index_name,
+        embedding=embedding_upstage
     )
     return vectorstore
 
-# 5. 검색기 설정
-def setup_retrievers(splits):
-    # Dense Retriever 설정
-    retriever = PineconeVectorStore.from_documents(splits, embedding=embedding_upstage, index_name="samsung").as_retriever(search_type='mmr', search_kwargs={"k": 10})
-    
-    # Sparse Retriever (BM25) 설정
-    bm25_retriever = BM25Retriever.from_documents(documents=splits)
-    
-    # Ensemble Retriever 설정 (Dense + Sparse)
-    ensemble_retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, retriever],
-        weights=[0.7, 0.3]  # 각 Retriever의 가중치
+# 2. 검색기 설정
+def setup_retrievers(vectorstore):
+    # Dense Retriever (Pinecone)
+    retriever = vectorstore.as_retriever(
+        search_type='mmr',
+        search_kwargs={"k": 10}
     )
     
+    # Ensemble Retriever (Dense만 사용)
+    ensemble_retriever = EnsembleRetriever(
+        retrievers=[retriever],
+        weights=[1.0]  # Dense Retriever에 가중치 100%
+    )
     return ensemble_retriever
 
-# 6. 챗봇 응답 생성
+# 3. 챗봇 응답 생성
 def generate_response(ensemble_retriever, query):
     result_docs = ensemble_retriever.invoke(query)
-    
-    # 챗봇 프롬프트 설정
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -121,39 +65,26 @@ def generate_response(ensemble_retriever, query):
             ("human", "{input}"),
         ]
     )
-    
-    # LLM 모델 호출
     llm = ChatUpstage()
     chain = prompt | llm | StrOutputParser()
-    
-    # 응답 생성
     response = chain.invoke({"context": result_docs, "input": query})
     return response
 
-# 7. 메인 함수
+# 4. 메인 함수
 def main():
-    # 데이터 로드
-    docs = load_data()
-    
-    # 문서 분할
-    splits = split_documents(docs)
-    
-    # Pinecone 설정
-    pc = setup_pinecone()
-    
-    # 벡터 저장소 생성
-    vectorstore = create_vectorstore(splits, embedding_upstage)
+    # Pinecone에서 벡터 저장소 불러오기
+    vectorstore = load_vectorstore(index_name)
+    print("✅ Pinecone 벡터 저장소 로드 완료.")
     
     # 검색기 설정
-    ensemble_retriever = setup_retrievers(splits)
+    ensemble_retriever = setup_retrievers(vectorstore)
+    print("✅ 검색기 설정 완료.")
     
-    # 쿼리 및 응답 생성
-    query = "2024년 삼성전자의 주요 기술 동향"
+    # 사용자 쿼리 입력
+    query = input("🔍 질문을 입력하세요: ")
     response = generate_response(ensemble_retriever, query)
-    
-    # 응답 출력
+    print("🤖 챗봇 응답:")
     print(response)
 
-# 실행
 if __name__ == "__main__":
     main()

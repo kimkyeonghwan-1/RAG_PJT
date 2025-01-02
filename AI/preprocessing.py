@@ -120,4 +120,4 @@ if __name__ == "__main__":
     # 결과를 CSV 파일로 저장
     save_to_csv(processed_df, 'df_dart.csv')
 
-    print("데이터 전처리 및 저장 완료.")
+    print("✅ 데이터 전처리 및 저장 완료.")

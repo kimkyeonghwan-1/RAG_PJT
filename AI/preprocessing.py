@@ -56,6 +56,7 @@ def fetch_disclosures(corp_code, start_date, end_date):
 def extract_section_text(rcept_no):
     try:
         # 공시 XML 데이터 불러오기
+        dart = OpenDartReader(dart_api_key)
         xml_data = dart.document(rcept_no)  
         soup = BeautifulSoup(xml_data, 'xml')
         
@@ -89,6 +90,9 @@ def preprocess_data(df):
     # 모든 내용을 text 컬럼에 저장
     df['text'] = df['주요 제품 및 서비스'] + df['주요 계약 및 연구개발활동'] + df['기타 참고사항']
 
+    # year 컬럼 추가
+    df['year'] = df['report_nm'].apply(lambda x: x[7:11])
+
     # 정규 표현식을 사용하여 여러 공백을 하나의 공백으로 변환
     def remove_extra_spaces(text):
         if isinstance(text, str):
@@ -99,6 +103,9 @@ def preprocess_data(df):
     columns_to_clean = ['주요 제품 및 서비스', '주요 계약 및 연구개발활동', '기타 참고사항', 'text']
     for col in columns_to_clean:
         df[col] = df[col].apply(remove_extra_spaces)
+
+    # 필요한 컬럼만 남기기
+    df = df[['corp_name', 'report_nm', 'rcept_dt', 'year', 'text']]
     
     return df
 

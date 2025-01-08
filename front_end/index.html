@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title></title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <script
+    src="https://kit.fontawesome.com/7692e5e1fc.js"
+    crossorigin="anonymous"
+    ></script>
+</head>
+
+<body class="h-screen flex flex-col bg-customSky300">
+    <!-- Header -->
+    <header
+        class="p-4 bg-gradient-to-r from-indigo-500 via-customSky900 to-indigo-500 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-semibold">ChatBot</h1>
+        </div>
+        <span class="text-sm opacity-90">Dart & RAG</span>
+    </header>
+
+    <!-- Main chat area -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-4 chat-scroll">
+        <!-- Messages will be dynamically inserted here -->
+    </main>
+
+    <!-- Input area with endpoint selector -->
+    <footer class="border-t border-gray-300 bg-white p-4">
+        <form id="message-form" class="flex items-center space-x-2">
+            <button id="new-chat-btn" type="button" class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
+                <i class="fa-solid fa-trash-arrow-up"></i></button>
+            <input type="text" id="user-input"
+                class="flex-1 border border-gray-300 rounded-md p-2 outline-none focus:border-blue-500"
+                placeholder="무엇이 궁금하신가요?" required />
+            <!-- <select id="api-selector" class="border border-gray-300 rounded-md p-2">
+                <option value="naive" selected>Naive (/chat)</option>
+                <option value="assistant">Assistant (/assistant)</option>
+            </select> -->
+            <button type="submit" class="bg-indigo-500 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                <i class="fa-regular fa-paper-plane" style="color: customSky100"></i>
+            </button>
+        </form>
+    </footer>
+
+    <script type="module" src="./src/app.js"></script>
+</body>
+
+</html>
